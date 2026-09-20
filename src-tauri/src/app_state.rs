@@ -14,6 +14,7 @@ use wgpu::{Texture, TextureView};
 use crate::ai_processing::AiState;
 use crate::cache_utils::DecodedImageCache;
 use crate::camera_tethering::CameraSession;
+use crate::fuji_raw_conv::FujiSessionHandle;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::launch_request::ExternalEditSession;
@@ -175,4 +176,5 @@ pub struct AppState {
     pub disks_cache: Mutex<Option<Disks>>,
     pub disks_cache_refreshing: AtomicBool,
     pub camera_session: Mutex<CameraSession>,
+    pub fuji_raw_conv_session: Mutex<FujiSessionHandle>,
 }
