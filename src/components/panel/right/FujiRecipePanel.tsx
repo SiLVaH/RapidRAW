@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { Camera, RefreshCw, Trash2, Play } from 'lucide-react';
+import { Camera, RefreshCw, Trash2, Play, Power } from 'lucide-react';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { Invokes } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextVariants } from '../../../types/typography';
+import Dropdown from '../../ui/Dropdown';
 
 export type FujiRecipe = {
   filmSimulation: number;
@@ -55,6 +56,8 @@ type QueueJob = {
   error?: string | null;
 };
 
+type ConvertQuality = 'full' | 'preview';
+
 const FILM_SIMS: Array<{ value: number; label: string; mono?: boolean }> = [
   { value: 0x01, label: 'Provia' },
   { value: 0x02, label: 'Velvia' },
@@ -100,6 +103,29 @@ const DEFAULT_RECIPE: FujiRecipe = {
   imageQuality: 0x02,
 };
 
+const GRAIN_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'weakSmall', label: 'Weak / Small' },
+  { value: 'strongSmall', label: 'Strong / Small' },
+  { value: 'weakLarge', label: 'Weak / Large' },
+  { value: 'strongLarge', label: 'Strong / Large' },
+] as const;
+
+const EFFECT_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'weak', label: 'Weak' },
+  { value: 'strong', label: 'Strong' },
+] as const;
+
+const WB_OPTIONS = [
+  { value: 0x0000, label: 'As Shot' },
+  { value: 0x0002, label: 'Auto' },
+  { value: 0x0004, label: 'Daylight' },
+  { value: 0x8006, label: 'Shade' },
+  { value: 0x0006, label: 'Incandescent' },
+  { value: 0x8007, label: 'Color Temperature' },
+];
+
 function statusLabel(status: string | undefined, t: (k: string) => string): string {
   switch (status) {
     case 'ready':
@@ -115,6 +141,42 @@ function statusLabel(status: string | undefined, t: (k: string) => string): stri
   }
 }
 
+function ToneSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  disabled: boolean;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs text-text-secondary">
+        {label}: {value.toFixed(step < 1 ? 1 : 0)}
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        className="w-full"
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </label>
+  );
+}
+
 export default function FujiRecipePanel() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -126,6 +188,8 @@ export default function FujiRecipePanel() {
   const [connected, setConnected] = useState<DiscoveredCamera | null>(null);
   const [queue, setQueue] = useState<QueueJob[]>([]);
   const [busy, setBusy] = useState(false);
+  const [quality, setQuality] = useState<ConvertQuality>('full');
+  const [showGuidance, setShowGuidance] = useState(false);
 
   const isCameraRender = Boolean(adjustments?.fujiCameraRender);
   const renderStatus = (adjustments?.fujiRenderStatus as string) || 'none';
@@ -137,6 +201,23 @@ export default function FujiRecipePanel() {
   const isMono = useMemo(
     () => FILM_SIMS.find((s) => s.value === recipe.filmSimulation)?.mono === true,
     [recipe.filmSimulation],
+  );
+
+  const filmOptions = useMemo(() => FILM_SIMS.map((s) => ({ value: s.value, label: s.label })), []);
+  const drOptions = useMemo(
+    () => [
+      { value: 100, label: 'DR100' },
+      { value: 200, label: 'DR200' },
+      { value: 400, label: 'DR400' },
+    ],
+    [],
+  );
+  const qualityOptions = useMemo(
+    () => [
+      { value: 'full' as const, label: t('editor.fujiRecipe.qualityFull') },
+      { value: 'preview' as const, label: t('editor.fujiRecipe.qualityPreview') },
+    ],
+    [t],
   );
 
   const updateRecipe = useCallback(
@@ -173,10 +254,30 @@ export default function FujiRecipePanel() {
     }
   }, []);
 
+  const refreshConnection = useCallback(async () => {
+    try {
+      const status = await invoke<{ connected: boolean; busId?: string; modelName?: string }>(
+        Invokes.FujiConnectionStatus,
+      );
+      if (status.connected && status.modelName) {
+        setConnected({
+          busId: status.busId || '',
+          modelName: status.modelName,
+          verified: true,
+        });
+      } else if (!status.connected) {
+        setConnected(null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     refreshSupport();
     refreshQueue();
-  }, [refreshSupport, refreshQueue]);
+    refreshConnection();
+  }, [refreshSupport, refreshQueue, refreshConnection]);
 
   useEffect(() => {
     const path = selectedImage?.path;
@@ -205,11 +306,13 @@ export default function FujiRecipePanel() {
     try {
       const list = await invoke<DiscoveredCamera[]>(Invokes.FujiListCameras);
       setCameras(list);
-      if (list.length === 0 && support?.platform) {
-        toast.info(support.platform.title);
+      if (list.length === 0) {
+        toast.info(t('editor.fujiRecipe.noCameras'));
+        setShowGuidance(true);
       }
     } catch (e: any) {
       toast.error(String(e));
+      setShowGuidance(true);
     } finally {
       setBusy(false);
     }
@@ -224,6 +327,20 @@ export default function FujiRecipePanel() {
       toast.success(t('editor.fujiRecipe.connected', { model: cam.modelName }));
     } catch (e: any) {
       toast.error(String(e));
+      setShowGuidance(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setBusy(true);
+    try {
+      await invoke(Invokes.FujiDisconnect);
+      setConnected(null);
+      toast.info(t('editor.fujiRecipe.disconnected'));
+    } catch (e: any) {
+      toast.error(String(e));
     } finally {
       setBusy(false);
     }
@@ -233,6 +350,7 @@ export default function FujiRecipePanel() {
     setBusy(true);
     try {
       await invoke(Invokes.FujiRecoverSession);
+      await refreshConnection();
       toast.success(t('editor.fujiRecipe.recovered'));
     } catch (e: any) {
       toast.error(String(e));
@@ -273,6 +391,7 @@ export default function FujiRecipePanel() {
     try {
       const results = await invoke<Array<{ cacheKey: string; status: string; error?: string }>>(
         Invokes.FujiProcessQueue,
+        { quality },
       );
       await refreshQueue();
       const ready = results.find((r) => r.status === 'ready');
@@ -330,7 +449,7 @@ export default function FujiRecipePanel() {
   }
 
   return (
-    <div className="p-3 space-y-4 text-sm">
+    <div className="p-3 space-y-4 text-sm overflow-y-auto h-full">
       <div className="flex items-center justify-between gap-2">
         <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.title')}</Text>
         <span className="text-xs text-text-secondary">{statusLabel(renderStatus, t)}</span>
@@ -346,7 +465,7 @@ export default function FujiRecipePanel() {
         <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.camera')}</Text>
         <div className="flex flex-wrap gap-2">
           <button
-            className="px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-surface hover:bg-card-active disabled:opacity-50"
             disabled={busy}
             onClick={handleListCameras}
           >
@@ -354,18 +473,28 @@ export default function FujiRecipePanel() {
             {t('editor.fujiRecipe.scan')}
           </button>
           <button
-            className="px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-surface hover:bg-card-active disabled:opacity-50"
             disabled={busy || !connected}
             onClick={handleRecover}
           >
             <RefreshCw className="inline w-4 h-4 mr-1" />
             {t('editor.fujiRecipe.recover')}
           </button>
+          {connected && (
+            <button
+              className="px-2 py-1 rounded-md bg-surface hover:bg-card-active disabled:opacity-50"
+              disabled={busy}
+              onClick={handleDisconnect}
+            >
+              <Power className="inline w-4 h-4 mr-1" />
+              {t('editor.fujiRecipe.disconnect')}
+            </button>
+          )}
         </div>
         {cameras.map((cam) => (
           <button
             key={cam.busId}
-            className="block w-full text-left px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface"
+            className="block w-full text-left px-2 py-1.5 rounded-md bg-surface hover:bg-card-active"
             onClick={() => handleConnect(cam.busId)}
           >
             {cam.modelName}
@@ -381,8 +510,14 @@ export default function FujiRecipePanel() {
             {t('editor.fujiRecipe.connected', { model: connected.modelName })}
           </p>
         )}
-        {support?.platform?.requiresWinusb && (
-          <div className="text-xs text-text-secondary space-y-1">
+        <button
+          className="text-xs text-text-secondary underline"
+          onClick={() => setShowGuidance((v) => !v)}
+        >
+          {t('editor.fujiRecipe.usbGuidance')}
+        </button>
+        {showGuidance && support?.platform && (
+          <div className="text-xs text-text-secondary space-y-1 border border-surface rounded-md p-2">
             <p className="font-medium">{support.platform.title}</p>
             <ol className="list-decimal pl-4 space-y-0.5">
               {support.platform.steps.map((step) => (
@@ -395,194 +530,161 @@ export default function FujiRecipePanel() {
 
       <section className="space-y-2">
         <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.recipe')}</Text>
-        <label className="block">
+        <div>
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.filmSim')}</span>
-          <select
-            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
+          <Dropdown
+            className="mt-1"
             value={recipe.filmSimulation}
+            options={filmOptions}
             disabled={isCameraRender}
-            onChange={(e) => updateRecipe({ filmSimulation: Number(e.target.value) })}
-          >
-            {FILM_SIMS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
+            onChange={(v) => updateRecipe({ filmSimulation: Number(v) })}
+          />
+        </div>
+        <div>
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.dynamicRange')}</span>
-          <select
-            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
+          <Dropdown
+            className="mt-1"
             value={recipe.dynamicRange}
+            options={drOptions}
             disabled={isCameraRender}
-            onChange={(e) => updateRecipe({ dynamicRange: Number(e.target.value) })}
-          >
-            <option value={100}>DR100</option>
-            <option value={200}>DR200</option>
-            <option value={400}>DR400</option>
-          </select>
-        </label>
+            onChange={(v) => updateRecipe({ dynamicRange: Number(v) })}
+          />
+        </div>
 
-        {(
-          [
-            ['highlightTone', t('editor.fujiRecipe.highlightTone')],
-            ['shadowTone', t('editor.fujiRecipe.shadowTone')],
-            ['sharpness', t('editor.fujiRecipe.sharpness')],
-            ['clarity', t('editor.fujiRecipe.clarity')],
-          ] as Array<[keyof FujiRecipe, string]>
-        ).map(([key, label]) => (
-          <label key={key} className="block">
-            <span className="text-xs text-text-secondary">
-              {label}: {Number(recipe[key]).toFixed(1)}
-            </span>
-            <input
-              type="range"
-              min={-4}
-              max={4}
-              step={0.5}
-              className="w-full"
-              disabled={isCameraRender}
-              value={Number(recipe[key])}
-              onChange={(e) => updateRecipe({ [key]: Number(e.target.value) } as any)}
-            />
-          </label>
-        ))}
-
+        <ToneSlider
+          label={t('editor.fujiRecipe.highlightTone')}
+          value={recipe.highlightTone}
+          min={-4}
+          max={4}
+          step={0.5}
+          disabled={isCameraRender}
+          onChange={(v) => updateRecipe({ highlightTone: v })}
+        />
+        <ToneSlider
+          label={t('editor.fujiRecipe.shadowTone')}
+          value={recipe.shadowTone}
+          min={-4}
+          max={4}
+          step={0.5}
+          disabled={isCameraRender}
+          onChange={(v) => updateRecipe({ shadowTone: v })}
+        />
+        <ToneSlider
+          label={t('editor.fujiRecipe.sharpness')}
+          value={recipe.sharpness}
+          min={-4}
+          max={4}
+          step={0.5}
+          disabled={isCameraRender}
+          onChange={(v) => updateRecipe({ sharpness: v })}
+        />
+        <ToneSlider
+          label={t('editor.fujiRecipe.clarity')}
+          value={recipe.clarity}
+          min={-5}
+          max={5}
+          step={1}
+          disabled={isCameraRender}
+          onChange={(v) => updateRecipe({ clarity: v })}
+        />
         {!isMono && (
-          <label className="block">
-            <span className="text-xs text-text-secondary">
-              {t('editor.fujiRecipe.color')}: {recipe.color.toFixed(1)}
-            </span>
-            <input
-              type="range"
-              min={-4}
-              max={4}
-              step={0.5}
-              className="w-full"
-              disabled={isCameraRender}
-              value={recipe.color}
-              onChange={(e) => updateRecipe({ color: Number(e.target.value) })}
-            />
-          </label>
+          <ToneSlider
+            label={t('editor.fujiRecipe.color')}
+            value={recipe.color}
+            min={-4}
+            max={4}
+            step={0.5}
+            disabled={isCameraRender}
+            onChange={(v) => updateRecipe({ color: v })}
+          />
         )}
-
         {isMono && (
           <>
-            <label className="block">
-              <span className="text-xs text-text-secondary">
-                {t('editor.fujiRecipe.monoWc')}: {recipe.monoWc.toFixed(1)}
-              </span>
-              <input
-                type="range"
-                min={-9}
-                max={9}
-                step={1}
-                className="w-full"
-                disabled={isCameraRender}
-                value={recipe.monoWc}
-                onChange={(e) => updateRecipe({ monoWc: Number(e.target.value) })}
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-text-secondary">
-                {t('editor.fujiRecipe.monoMg')}: {recipe.monoMg.toFixed(1)}
-              </span>
-              <input
-                type="range"
-                min={-9}
-                max={9}
-                step={1}
-                className="w-full"
-                disabled={isCameraRender}
-                value={recipe.monoMg}
-                onChange={(e) => updateRecipe({ monoMg: Number(e.target.value) })}
-              />
-            </label>
+            <ToneSlider
+              label={t('editor.fujiRecipe.monoWc')}
+              value={recipe.monoWc}
+              min={-9}
+              max={9}
+              step={1}
+              disabled={isCameraRender}
+              onChange={(v) => updateRecipe({ monoWc: v })}
+            />
+            <ToneSlider
+              label={t('editor.fujiRecipe.monoMg')}
+              value={recipe.monoMg}
+              min={-9}
+              max={9}
+              step={1}
+              disabled={isCameraRender}
+              onChange={(v) => updateRecipe({ monoMg: v })}
+            />
           </>
         )}
 
-        <label className="block">
+        <div>
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.grain')}</span>
-          <select
-            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
+          <Dropdown
+            className="mt-1"
             value={recipe.grain}
+            options={[...GRAIN_OPTIONS]}
             disabled={isCameraRender}
-            onChange={(e) => updateRecipe({ grain: e.target.value as FujiRecipe['grain'] })}
-          >
-            <option value="off">Off</option>
-            <option value="weakSmall">Weak / Small</option>
-            <option value="strongSmall">Strong / Small</option>
-            <option value="weakLarge">Weak / Large</option>
-            <option value="strongLarge">Strong / Large</option>
-          </select>
-        </label>
-
-        <label className="block">
+            onChange={(v) => updateRecipe({ grain: v as FujiRecipe['grain'] })}
+          />
+        </div>
+        <div>
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.colorChrome')}</span>
-          <select
-            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
+          <Dropdown
+            className="mt-1"
             value={recipe.colorChrome}
+            options={[...EFFECT_OPTIONS]}
             disabled={isCameraRender}
-            onChange={(e) =>
-              updateRecipe({ colorChrome: e.target.value as FujiRecipe['colorChrome'] })
-            }
-          >
-            <option value="off">Off</option>
-            <option value="weak">Weak</option>
-            <option value="strong">Strong</option>
-          </select>
-        </label>
-
-        <label className="block">
+            onChange={(v) => updateRecipe({ colorChrome: v as FujiRecipe['colorChrome'] })}
+          />
+        </div>
+        <div>
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.wb')}</span>
-          <select
-            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
+          <Dropdown
+            className="mt-1"
             value={recipe.whiteBalance}
+            options={WB_OPTIONS}
             disabled={isCameraRender}
-            onChange={(e) => updateRecipe({ whiteBalance: Number(e.target.value) })}
-          >
-            <option value={0x0000}>As Shot</option>
-            <option value={0x0002}>Auto</option>
-            <option value={0x0004}>Daylight</option>
-            <option value={0x8006}>Shade</option>
-            <option value={0x0006}>Incandescent</option>
-            <option value={0x8007}>Color Temperature</option>
-          </select>
-        </label>
-
+            onChange={(v) => updateRecipe({ whiteBalance: Number(v) })}
+          />
+        </div>
         {recipe.whiteBalance === 0x8007 && (
-          <label className="block">
-            <span className="text-xs text-text-secondary">
-              {t('editor.fujiRecipe.colorTemp')}: {recipe.colorTempK} K
-            </span>
-            <input
-              type="range"
-              min={2500}
-              max={10000}
-              step={10}
-              className="w-full"
-              disabled={isCameraRender}
-              value={recipe.colorTempK}
-              onChange={(e) => updateRecipe({ colorTempK: Number(e.target.value) })}
-            />
-          </label>
+          <ToneSlider
+            label={t('editor.fujiRecipe.colorTemp')}
+            value={recipe.colorTempK}
+            min={2500}
+            max={10000}
+            step={10}
+            disabled={isCameraRender}
+            onChange={(v) => updateRecipe({ colorTempK: v })}
+          />
         )}
       </section>
 
       <section className="space-y-2">
         <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.queue')}</Text>
+        <div>
+          <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.quality')}</span>
+          <Dropdown
+            className="mt-1"
+            value={quality}
+            options={qualityOptions}
+            onChange={(v) => setQuality(v as ConvertQuality)}
+          />
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="px-2 py-1 rounded-md bg-accent text-bg-primary disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-accent text-button-text disabled:opacity-50"
             disabled={busy || !selectedImage || isCameraRender}
             onClick={handleEnqueue}
           >
             {t('editor.fujiRecipe.enqueue')}
           </button>
           <button
-            className="px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-surface hover:bg-card-active disabled:opacity-50"
             disabled={busy}
             onClick={handleProcessQueue}
           >
@@ -590,14 +692,14 @@ export default function FujiRecipePanel() {
             {t('editor.fujiRecipe.processQueue')}
           </button>
           <button
-            className="px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-surface hover:bg-card-active disabled:opacity-50"
             disabled={busy || renderStatus !== 'ready'}
             onClick={handleCreateVersion}
           >
             {t('editor.fujiRecipe.createVersion')}
           </button>
           <button
-            className="px-2 py-1 rounded-md bg-bg-tertiary hover:bg-surface"
+            className="px-2 py-1 rounded-md bg-surface hover:bg-card-active"
             onClick={handlePurgeCache}
           >
             <Trash2 className="inline w-4 h-4 mr-1" />

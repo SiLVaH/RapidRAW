@@ -6,6 +6,7 @@
 pub mod cache;
 mod capabilities;
 mod convert;
+mod d185;
 mod error;
 mod platform;
 pub mod preset;
@@ -20,6 +21,7 @@ mod sample_raf_tests;
 
 pub use cache::RenderStatus;
 pub use capabilities::DiscoveredCamera;
+pub use d185::ConvertQuality;
 #[allow(unused_imports)]
 pub use error::FujiRawConvError;
 pub use platform::PlatformUsbGuidance;
@@ -36,6 +38,7 @@ use capabilities::describe_device;
 use convert::SessionRawConverter;
 #[cfg(feature = "fuji-raw-conv")]
 use convert::RawConverter;
+use error::FujiRawConvErrorKind;
 use platform::current_platform_guidance;
 use serde::Serialize;
 use std::fs;
@@ -270,10 +273,14 @@ pub fn fuji_list_queue(app_handle: tauri::AppHandle) -> Result<Vec<QueueJob>, St
 }
 
 #[tauri::command]
-pub async fn fuji_process_queue(app_handle: tauri::AppHandle) -> Result<Vec<RenderJobResult>, String> {
+pub async fn fuji_process_queue(
+    app_handle: tauri::AppHandle,
+    quality: Option<ConvertQuality>,
+) -> Result<Vec<RenderJobResult>, String> {
     #[cfg(feature = "fuji-raw-conv")]
     {
         use tauri::Manager;
+        let quality = quality.unwrap_or(ConvertQuality::Full);
         tauri::async_runtime::spawn_blocking(move || {
             let state = app_handle.state::<AppState>();
             let mut results = Vec::new();
@@ -292,7 +299,6 @@ pub async fn fuji_process_queue(app_handle: tauri::AppHandle) -> Result<Vec<Rend
                         "No camera connected. Keep jobs queued until the camera is in USB RAW CONV. mode."
                             .into(),
                     );
-                    // Put it back and stop — offline-first.
                     state.fuji_convert_queue.enqueue(failed.clone());
                     results.push(RenderJobResult {
                         cache_key: failed.cache_key,
@@ -317,7 +323,7 @@ pub async fn fuji_process_queue(app_handle: tauri::AppHandle) -> Result<Vec<Rend
                 };
 
                 let mut converter = SessionRawConverter { session };
-                match converter.convert_raf(&raf, &job.recipe) {
+                match converter.convert_raf(&raf, &job.recipe, quality) {
                     Ok(jpeg) => {
                         let meta = store_jpeg(
                             &root,
@@ -336,6 +342,25 @@ pub async fn fuji_process_queue(app_handle: tauri::AppHandle) -> Result<Vec<Rend
                         });
                     }
                     Err(err) => {
+                        // Transient session errors: re-queue so offline-first still works.
+                        if matches!(
+                            err.kind,
+                            FujiRawConvErrorKind::SessionClosed
+                                | FujiRawConvErrorKind::WrongUsbMode
+                                | FujiRawConvErrorKind::NoCamera
+                        ) {
+                            let mut requeued = job.clone();
+                            requeued.status = RenderStatus::Queued;
+                            requeued.error = Some(err.to_command_error());
+                            state.fuji_convert_queue.enqueue(requeued.clone());
+                            results.push(RenderJobResult {
+                                cache_key: requeued.cache_key,
+                                status: RenderStatus::Queued,
+                                jpeg_path: None,
+                                error: requeued.error,
+                            });
+                            break;
+                        }
                         results.push(RenderJobResult {
                             cache_key: job.cache_key,
                             status: RenderStatus::Failed,
@@ -352,8 +377,49 @@ pub async fn fuji_process_queue(app_handle: tauri::AppHandle) -> Result<Vec<Rend
     }
     #[cfg(not(feature = "fuji-raw-conv"))]
     {
-        let _ = app_handle;
+        let _ = (app_handle, quality);
         Err(FujiRawConvError::not_in_build().to_command_error())
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FujiConnectionStatus {
+    pub connected: bool,
+    pub bus_id: Option<String>,
+    pub model_name: Option<String>,
+}
+
+#[tauri::command]
+pub fn fuji_connection_status(app_handle: tauri::AppHandle) -> Result<FujiConnectionStatus, String> {
+    #[cfg(feature = "fuji-raw-conv")]
+    {
+        use tauri::Manager;
+        let state = app_handle.state::<AppState>();
+        let guard = state.fuji_raw_conv_session.lock().unwrap();
+        if let Some(session) = guard.session.as_ref() {
+            let info = session.device_info();
+            Ok(FujiConnectionStatus {
+                connected: session.is_open(),
+                bus_id: Some(info.bus_id.clone()),
+                model_name: info.product.clone().or(info.manufacturer.clone()),
+            })
+        } else {
+            Ok(FujiConnectionStatus {
+                connected: false,
+                bus_id: None,
+                model_name: None,
+            })
+        }
+    }
+    #[cfg(not(feature = "fuji-raw-conv"))]
+    {
+        let _ = app_handle;
+        Ok(FujiConnectionStatus {
+            connected: false,
+            bus_id: None,
+            model_name: None,
+        })
     }
 }
 

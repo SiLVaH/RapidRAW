@@ -2185,6 +2185,7 @@ pub fn run() {
             fuji_raw_conv::fuji_cache_stats,
             fuji_raw_conv::fuji_purge_cache,
             fuji_raw_conv::fuji_create_camera_render_version,
+            fuji_raw_conv::fuji_connection_status,
             ai_commands::generate_ai_subject_mask,
             ai_commands::precompute_ai_subject_mask,
             ai_commands::generate_ai_foreground_mask,

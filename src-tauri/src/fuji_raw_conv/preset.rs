@@ -383,7 +383,7 @@ fn decode_tone(raw: i32) -> f32 {
     raw as f32 / 10.0
 }
 
-fn encode_high_iso_nr(level: i8) -> i32 {
+pub(crate) fn encode_high_iso_nr(level: i8) -> i32 {
     match level {
         -4 => 0x8000,
         -3 => 0x7000,

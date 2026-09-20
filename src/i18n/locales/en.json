@@ -778,6 +778,13 @@
       "renderReady": "Camera render ready",
       "versionCreated": "Camera-render version created",
       "cachePurged": "Purged {{bytes}} bytes from cache",
+      "disconnect": "Disconnect",
+      "disconnected": "Camera disconnected",
+      "quality": "Output quality",
+      "qualityFull": "Full resolution",
+      "qualityPreview": "Preview (half-res)",
+      "usbGuidance": "USB setup",
+      "noCameras": "No Fujifilm camera found. Put the body in USB RAW CONV. mode and scan again.",
       "status": {
         "none": "No render",
         "queued": "Queued",

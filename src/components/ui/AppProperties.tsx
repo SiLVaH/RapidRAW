@@ -130,6 +130,7 @@ export enum Invokes {
   FujiCacheStats = 'fuji_cache_stats',
   FujiPurgeCache = 'fuji_purge_cache',
   FujiCreateCameraRenderVersion = 'fuji_create_camera_render_version',
+  FujiConnectionStatus = 'fuji_connection_status',
 }
 
 export enum ExifOverlay {

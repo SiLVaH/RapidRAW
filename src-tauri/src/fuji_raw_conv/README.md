@@ -2,7 +2,7 @@
 
 Camera-backed Fujifilm RAW conversion (USB RAW CONV. / PTP), feature-gated so
 default builds stay free of USB deps. Matches X RAW Studio flow:
-USB RAF + recipe params → camera processor → rendered JPEG.
+USB RAF + recipe → camera processor → rendered JPEG.
 
 ## Decisions locked in
 
@@ -13,34 +13,31 @@ USB RAF + recipe params → camera processor → rendered JPEG.
 - User-facing errors for PTP `0x2002` (body mismatch) and wrong USB mode
 - WinUSB / udev guidance via `fuji_raw_conv_platform_guidance`
 - Capability table: X100VI verified; other Fuji bodies warned as untested
+- Conversion uses **D185 native profile patching** (not only D18E–D1A5 presets)
+- D183 trigger: `0` = preview / half-res, `1` = full-resolution (default)
 - A5: separate camera-render virtual copy; cache under app cache dir keyed
   `hash(RAF)+hash(recipe)` with size limit + purge
 - Scene-referred edits grayed out on camera-render versions
-- Offline-first queue (enqueue without camera; process when connected)
-- Export is first-class via camera-render virtual copies
+- Offline-first queue; export first-class via camera-render VCs
+- Study-only reimplementation (no fujihack / no copied filmkit source)
 
-## Phases
+## Conversion pipeline
 
-| Phase | Status | Contents |
-|-------|--------|----------|
-| A1 | done | PTP transport over nusb, session, capabilities, platform guidance |
-| A2 | done | Preset encode/decode D18E–D1A5 + HighIsoNR/mono/CT rules |
-| A3 | done | RAF conversion round-trip via mockable `RawConverter` trait |
-| A4 | done | Fuji Recipe UI panel, status, export camera-render choice |
-| A5 | done | Camera-render version, disk cache, offline queue, sidecar flags |
+1. `OpenSession` + capability probe (`GetDevicePropDesc` on D183/D185)
+2. `SendObjectInfo` (0x900C) + `SendObject` (0x900D) — upload RAF
+3. `GetDevicePropValue` D185 — read base profile (~625 bytes)
+4. Patch profile fields (film sim, DR, tones ×10, grain, chrome, WB, NR…)
+5. `SetDevicePropValue` D185
+6. `SetDevicePropValue` D183 — start conversion
+7. Poll `GetObjectHandles` → `GetObject` → `DeleteObject`
 
-Goal B (X-Trans demosaic / embedded lens tables) remains report-only until A ships.
+Preset properties D18E–D1A5 remain available for encode/decode / future slot sync.
 
 ## How to build
 
 ```bash
-# default — no nusb, stubs return clear errors
 cargo check
-
-# with camera RAW CONV support
 cargo check --features fuji-raw-conv
-
-# frontend + feature (from repo root)
 npm run start:fuji-raw-conv
 ```
 
@@ -51,10 +48,10 @@ cargo test --lib fuji_raw_conv
 cargo test --lib fuji_raw_conv --features fuji-raw-conv
 ```
 
-Mock transport covers session open/close/recover and conversion without hardware.
+Includes mock end-to-end convert flow and optional real X100VI RAF samples under
+`/tmp/fuji-samples/` (from raw.pixls.us).
 
-## Study-only note
+## Hardware required for a full render
 
-Protocol constants and flow are reimplemented from public PTP/ISO docs and
-study of prior art licenses (filmkit MIT, rawji GPL-3+, libfuji MIT). No
-fujihack code is copied.
+A Fujifilm body in **USB RAW CONV. / BACKUP RESTORE** mode. Without a camera,
+enqueue still works; process queue stays offline-first until connect.
