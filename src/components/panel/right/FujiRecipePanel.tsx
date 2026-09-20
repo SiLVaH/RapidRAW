@@ -3,10 +3,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { Camera, RefreshCw, Trash2, Play } from 'lucide-react';
-import { useEditorStore } from '../../store/useEditorStore';
-import { Invokes } from '../ui/AppProperties';
-import Text from '../ui/Text';
-import { TextVariants } from '../ui/Types';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useEditorActions } from '../../../hooks/useEditorActions';
+import { Invokes } from '../../ui/AppProperties';
+import Text from '../../ui/Text';
+import { TextVariants } from '../../../types/typography';
 
 export type FujiRecipe = {
   filmSimulation: number;
@@ -118,7 +119,7 @@ export default function FujiRecipePanel() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
-  const setAdjustments = useEditorStore((s) => s.setAdjustments);
+  const { setAdjustments } = useEditorActions();
 
   const [support, setSupport] = useState<SupportInfo | null>(null);
   const [cameras, setCameras] = useState<DiscoveredCamera[]>([]);
