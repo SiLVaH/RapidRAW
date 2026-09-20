@@ -127,6 +127,98 @@ impl PtpSession {
         }
     }
 
+    /// Command with a data-out phase (SetDevicePropValue, SendObject, …).
+    pub fn transact_command_with_data_out(
+        &mut self,
+        opcode: u16,
+        params: &[u32],
+        payload: Vec<u8>,
+        context: PtpErrorContext,
+        timeout: Duration,
+    ) -> Result<PtpContainer, FujiRawConvError> {
+        if !self.open {
+            return Err(FujiRawConvError::new(
+                FujiRawConvErrorKind::SessionClosed,
+                "No open PTP session with the camera.",
+            ));
+        }
+
+        let tid = self.next_transaction_id();
+        let cmd = PtpContainer::command(opcode, tid, params);
+        self.transport.write_container(&cmd)?;
+        let data = PtpContainer::data(opcode, tid, payload);
+        self.transport.write_container(&data)?;
+
+        // Some cameras may insert an empty DATA-in; accept RESPONSE.
+        let mut attempts = 0;
+        loop {
+            let container = self.transport.read_container(timeout)?;
+            if container.transaction_id != tid {
+                return Err(FujiRawConvError::new(
+                    FujiRawConvErrorKind::Protocol,
+                    "PTP transaction ID mismatch.",
+                )
+                .with_detail(format!(
+                    "expected {tid}, got {}",
+                    container.transaction_id
+                )));
+            }
+            match container.type_ {
+                container_type::RESPONSE => {
+                    if container.code != codes::response::OK {
+                        return Err(FujiRawConvError::from_ptp_response(container.code, context));
+                    }
+                    return Ok(container);
+                }
+                container_type::DATA => {
+                    attempts += 1;
+                    if attempts > 2 {
+                        return Err(FujiRawConvError::new(
+                            FujiRawConvErrorKind::Protocol,
+                            "Unexpected DATA containers after data-out command.",
+                        ));
+                    }
+                }
+                other => {
+                    return Err(FujiRawConvError::new(
+                        FujiRawConvErrorKind::Protocol,
+                        "Unexpected PTP container during data-out transaction.",
+                    )
+                    .with_detail(format!("type=0x{other:04X}")));
+                }
+            }
+        }
+    }
+
+    pub fn set_device_prop_raw(
+        &mut self,
+        prop_id: u16,
+        payload: Vec<u8>,
+        context: PtpErrorContext,
+    ) -> Result<(), FujiRawConvError> {
+        self.transact_command_with_data_out(
+            codes::op::SET_DEVICE_PROP_VALUE,
+            &[u32::from(prop_id)],
+            payload,
+            context,
+            DEFAULT_TIMEOUT,
+        )?;
+        Ok(())
+    }
+
+    pub fn get_device_prop_raw(
+        &mut self,
+        prop_id: u16,
+        context: PtpErrorContext,
+    ) -> Result<Vec<u8>, FujiRawConvError> {
+        let (_resp, data) = self.transact_command_with_data_in(
+            codes::op::GET_DEVICE_PROP_VALUE,
+            &[u32::from(prop_id)],
+            context,
+        )?;
+        Ok(data)
+    }
+
     fn read_until_response(&mut self, tid: u32) -> Result<PtpContainer, FujiRawConvError> {
         let container = self.transport.read_container(DEFAULT_TIMEOUT)?;
         if container.transaction_id != tid {

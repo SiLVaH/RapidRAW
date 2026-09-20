@@ -900,6 +900,49 @@ pub async fn load_image(
 
     let metadata: ImageMetadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
+    // Camera-render virtual copies load the cached JPEG, not the source RAF.
+    if metadata
+        .adjustments
+        .get("fujiCameraRender")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+        && let Some(cache_key) = metadata
+            .adjustments
+            .get("fujiCacheKey")
+            .and_then(|v| v.as_str())
+    {
+        if let Ok(root) = crate::fuji_raw_conv::cache::cache_root(&app_handle) {
+            let jpeg_path = root.join(format!("{cache_key}.jpg"));
+            if jpeg_path.is_file() {
+                let img = tokio::task::spawn_blocking({
+                    let jpeg_path = jpeg_path.clone();
+                    move || {
+                        image::open(&jpeg_path)
+                            .map_err(|e| format!("Failed to open camera render: {e}"))
+                    }
+                })
+                .await
+                .map_err(|e| format!("Task panicked: {e}"))??;
+
+                let (orig_width, orig_height) = img.dimensions();
+                let arc_img = Arc::new(img);
+                *state.original_image.lock().unwrap() = Some(LoadedImage {
+                    path: path.clone(),
+                    image: arc_img,
+                    is_raw: false,
+                });
+
+                return Ok(LoadImageResult {
+                    width: orig_width,
+                    height: orig_height,
+                    metadata,
+                    exif: HashMap::new(),
+                    is_raw: false,
+                });
+            }
+        }
+    }
+
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
     let path_clone = source_path_str.clone();

@@ -2140,6 +2140,7 @@ pub fn run() {
             disks_cache_refreshing: AtomicBool::new(false),
             camera_session: Mutex::new(camera_tethering::CameraSession::new()),
             fuji_raw_conv_session: Mutex::new(fuji_raw_conv::FujiSessionHandle::new()),
+            fuji_convert_queue: fuji_raw_conv::new_convert_queue(),
         })
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
@@ -2175,6 +2176,15 @@ pub fn run() {
             fuji_raw_conv::fuji_connect,
             fuji_raw_conv::fuji_disconnect,
             fuji_raw_conv::fuji_recover_session,
+            fuji_raw_conv::fuji_parse_recipe_from_raf,
+            fuji_raw_conv::fuji_recipe_encode_roundtrip,
+            fuji_raw_conv::fuji_enqueue_convert,
+            fuji_raw_conv::fuji_list_queue,
+            fuji_raw_conv::fuji_process_queue,
+            fuji_raw_conv::fuji_get_cached_render,
+            fuji_raw_conv::fuji_cache_stats,
+            fuji_raw_conv::fuji_purge_cache,
+            fuji_raw_conv::fuji_create_camera_render_version,
             ai_commands::generate_ai_subject_mask,
             ai_commands::precompute_ai_subject_mask,
             ai_commands::generate_ai_foreground_mask,

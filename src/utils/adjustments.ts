@@ -267,6 +267,36 @@ export interface Adjustments {
   vignetteMidpoint: number;
   vignetteRoundness: number;
   whites: number;
+  /** Display-referred JPEG from Fujifilm camera RAW CONV — scene-referred edits disabled. */
+  fujiCameraRender?: boolean;
+  fujiRecipe?: FujiRecipeAdjustments | null;
+  fujiCacheKey?: string | null;
+  fujiRenderStatus?: 'none' | 'queued' | 'ready' | 'stale' | 'failed' | null;
+}
+
+export interface FujiRecipeAdjustments {
+  filmSimulation: number;
+  dynamicRange: number;
+  highlightTone: number;
+  shadowTone: number;
+  color: number;
+  sharpness: number;
+  grain: 'off' | 'weakSmall' | 'strongSmall' | 'weakLarge' | 'strongLarge';
+  clarity: number;
+  colorChrome: 'off' | 'weak' | 'strong';
+  colorChromeFxBlue: 'off' | 'weak' | 'strong';
+  whiteBalance: number;
+  wbShiftR: number;
+  wbShiftB: number;
+  colorTempK: number;
+  highIsoNr: number;
+  monoWc: number;
+  monoMg: number;
+  smoothSkin: 'off' | 'weak' | 'strong';
+  longExpNr: boolean;
+  colorSpaceSrgb: boolean;
+  imageSize: number;
+  imageQuality: number;
 }
 
 export interface AiPatch {
@@ -611,6 +641,10 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   vignetteMidpoint: 50,
   vignetteRoundness: 0,
   whites: 0,
+  fujiCameraRender: false,
+  fujiRecipe: null,
+  fujiCacheKey: null,
+  fujiRenderStatus: null,
 };
 
 const deepCloneCurves = (curves: any): Curves => ({
@@ -761,6 +795,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
       ...(loadedAdjustments.sectionVisibility || {}),
     },
     sharpnessThreshold: loadedAdjustments.sharpnessThreshold ?? INITIAL_ADJUSTMENTS.sharpnessThreshold,
+    fujiCameraRender: loadedAdjustments.fujiCameraRender ?? false,
+    fujiRecipe: loadedAdjustments.fujiRecipe ?? null,
+    fujiCacheKey: loadedAdjustments.fujiCacheKey ?? null,
+    fujiRenderStatus: loadedAdjustments.fujiRenderStatus ?? null,
   };
 };
 

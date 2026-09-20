@@ -127,6 +127,10 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "glowAmount",
         "halationAmount",
         "flareAmount",
+        "fujiCameraRender",
+        "fujiRecipe",
+        "fujiCacheKey",
+        "fujiRenderStatus",
         "crop",
         "aspectRatio",
         "rotation",
@@ -187,6 +191,10 @@ pub fn default_included_adjustments() -> HashSet<String> {
         "lensTcaEnabled",
         "lensVignetteEnabled",
         "guidedPerspective",
+        "fujiCameraRender",
+        "fujiRecipe",
+        "fujiCacheKey",
+        "fujiRenderStatus",
     ];
 
     for item in off_by_default.iter() {
@@ -340,6 +348,7 @@ impl Default for WorkspaceState {
                 "masks".to_string(),
                 "ai".to_string(),
                 "presets".to_string(),
+                "fujiRecipe".to_string(),
             ],
         );
         panel_layout.insert("rightBottom".to_string(), vec![]);

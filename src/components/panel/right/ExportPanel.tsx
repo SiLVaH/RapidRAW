@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
 import Button from '../../ui/Button';
@@ -253,8 +254,14 @@ export default function ExportPanel({
   } = useExportSettings();
 
   const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
+  const adjustments = useEditorStore((s) => s.adjustments);
+  const isFujiCameraRender = Boolean(adjustments?.fujiCameraRender);
+  const hasFujiCacheReady =
+    Boolean(adjustments?.fujiCacheKey) &&
+    (adjustments?.fujiRenderStatus === 'ready' || isFujiCameraRender);
 
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
+  const [fujiExportBusy, setFujiExportBusy] = useState(false);
   const initDone = useRef(false);
 
   useEffect(() => {
@@ -611,6 +618,40 @@ export default function ExportPanel({
                 onApplyPreset={handleApplyPreset}
               />
             </div>
+
+            {(isFujiCameraRender || hasFujiCacheReady) && (
+              <Section title={t('export.sections.fujiCameraRender')}>
+                <p className="text-xs text-text-secondary">
+                  {isFujiCameraRender
+                    ? t('export.fujiCameraRender.activeHint')
+                    : t('export.fujiCameraRender.availableHint')}
+                </p>
+                {!isFujiCameraRender && hasFujiCacheReady && adjustments?.fujiCacheKey && (
+                  <Button
+                    className="mt-2"
+                    disabled={isExporting || fujiExportBusy || !selectedImage?.path}
+                    onClick={async () => {
+                      if (!selectedImage?.path || !adjustments?.fujiCacheKey) return;
+                      setFujiExportBusy(true);
+                      try {
+                        const path = await invoke<string>(Invokes.FujiCreateCameraRenderVersion, {
+                          sourceVirtualPath: selectedImage.path,
+                          recipe: adjustments.fujiRecipe || {},
+                          cacheKey: adjustments.fujiCacheKey,
+                        });
+                        toast.success(t('editor.fujiRecipe.versionCreated', { path }));
+                      } catch (e: any) {
+                        toast.error(String(e));
+                      } finally {
+                        setFujiExportBusy(false);
+                      }
+                    }}
+                  >
+                    {t('export.fujiCameraRender.createVersion')}
+                  </Button>
+                )}
+              </Section>
+            )}
 
             <Section title={t('export.sections.fileSettings')}>
               <div className="grid grid-cols-3 gap-2">
