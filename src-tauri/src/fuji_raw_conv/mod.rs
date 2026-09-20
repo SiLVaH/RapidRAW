@@ -15,6 +15,9 @@ mod recipe_parse;
 mod session;
 pub mod transport;
 
+#[cfg(all(test, feature = "fuji-raw-conv"))]
+mod sample_raf_tests;
+
 pub use cache::RenderStatus;
 pub use capabilities::DiscoveredCamera;
 #[allow(unused_imports)]
