@@ -398,7 +398,7 @@ export default function FujiRecipePanel() {
         <label className="block">
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.filmSim')}</span>
           <select
-            className="w-full mt-1 bg-bg-tertiary rounded-md px-2 py-1"
+            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
             value={recipe.filmSimulation}
             disabled={isCameraRender}
             onChange={(e) => updateRecipe({ filmSimulation: Number(e.target.value) })}
@@ -414,7 +414,7 @@ export default function FujiRecipePanel() {
         <label className="block">
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.dynamicRange')}</span>
           <select
-            className="w-full mt-1 bg-bg-tertiary rounded-md px-2 py-1"
+            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
             value={recipe.dynamicRange}
             disabled={isCameraRender}
             onChange={(e) => updateRecipe({ dynamicRange: Number(e.target.value) })}
@@ -506,7 +506,7 @@ export default function FujiRecipePanel() {
         <label className="block">
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.grain')}</span>
           <select
-            className="w-full mt-1 bg-bg-tertiary rounded-md px-2 py-1"
+            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
             value={recipe.grain}
             disabled={isCameraRender}
             onChange={(e) => updateRecipe({ grain: e.target.value as FujiRecipe['grain'] })}
@@ -522,7 +522,7 @@ export default function FujiRecipePanel() {
         <label className="block">
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.colorChrome')}</span>
           <select
-            className="w-full mt-1 bg-bg-tertiary rounded-md px-2 py-1"
+            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
             value={recipe.colorChrome}
             disabled={isCameraRender}
             onChange={(e) =>
@@ -538,7 +538,7 @@ export default function FujiRecipePanel() {
         <label className="block">
           <span className="text-xs text-text-secondary">{t('editor.fujiRecipe.wb')}</span>
           <select
-            className="w-full mt-1 bg-bg-tertiary rounded-md px-2 py-1"
+            className="w-full mt-1 bg-surface text-text-primary rounded-md px-2 py-1.5 text-sm border border-surface"
             value={recipe.whiteBalance}
             disabled={isCameraRender}
             onChange={(e) => updateRecipe({ whiteBalance: Number(e.target.value) })}
