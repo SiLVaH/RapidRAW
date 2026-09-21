@@ -9,6 +9,7 @@ import { Invokes } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextVariants } from '../../../types/typography';
 import Dropdown from '../../ui/Dropdown';
+import FujiFilmIcon from '../../icons/FujiFilmIcon';
 
 export type FujiRecipe = {
   filmSimulation: number;
@@ -441,7 +442,10 @@ export default function FujiRecipePanel() {
   if (support && !support.featureEnabled) {
     return (
       <div className="p-3 space-y-3 text-sm text-text-secondary">
-        <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.title')}</Text>
+        <div className="flex items-center gap-2">
+          <FujiFilmIcon size={18} className="text-[#FB0020] shrink-0" />
+          <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.title')}</Text>
+        </div>
         <p>{t('editor.fujiRecipe.notInBuild')}</p>
         <p className="text-xs">{support.platform.title}</p>
       </div>
@@ -451,7 +455,10 @@ export default function FujiRecipePanel() {
   return (
     <div className="p-3 space-y-4 text-sm overflow-y-auto h-full">
       <div className="flex items-center justify-between gap-2">
-        <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.title')}</Text>
+        <div className="flex items-center gap-2 min-w-0">
+          <FujiFilmIcon size={18} className="text-[#FB0020] shrink-0" />
+          <Text variant={TextVariants.heading}>{t('editor.fujiRecipe.title')}</Text>
+        </div>
         <span className="text-xs text-text-secondary">{statusLabel(renderStatus, t)}</span>
       </div>
 
