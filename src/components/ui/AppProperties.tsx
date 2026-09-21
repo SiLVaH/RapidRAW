@@ -115,6 +115,22 @@ export enum Invokes {
   TetherSetSetting = 'tether_set_setting',
   TetherCapture = 'tether_capture',
   TetherGetPreview = 'tether_get_preview',
+  IsFujiRawConvSupported = 'is_fuji_raw_conv_supported',
+  FujiRawConvPlatformGuidance = 'fuji_raw_conv_platform_guidance',
+  FujiListCameras = 'fuji_list_cameras',
+  FujiConnect = 'fuji_connect',
+  FujiDisconnect = 'fuji_disconnect',
+  FujiRecoverSession = 'fuji_recover_session',
+  FujiParseRecipeFromRaf = 'fuji_parse_recipe_from_raf',
+  FujiRecipeEncodeRoundtrip = 'fuji_recipe_encode_roundtrip',
+  FujiEnqueueConvert = 'fuji_enqueue_convert',
+  FujiListQueue = 'fuji_list_queue',
+  FujiProcessQueue = 'fuji_process_queue',
+  FujiGetCachedRender = 'fuji_get_cached_render',
+  FujiCacheStats = 'fuji_cache_stats',
+  FujiPurgeCache = 'fuji_purge_cache',
+  FujiCreateCameraRenderVersion = 'fuji_create_camera_render_version',
+  FujiConnectionStatus = 'fuji_connection_status',
 }
 
 export enum ExifOverlay {
@@ -133,6 +149,7 @@ export enum Panel {
   Presets = 'presets',
   FolderTree = 'folderTree',
   Tethering = 'tethering',
+  FujiRecipe = 'fujiRecipe',
 }
 
 export type PanelRegion = 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom';

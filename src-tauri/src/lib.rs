@@ -21,6 +21,7 @@ mod export_processing;
 mod file_management;
 mod focus_stacking;
 mod formats;
+mod fuji_raw_conv;
 mod gpu_processing;
 mod guided_perspective;
 mod hdr_deghosting;
@@ -2138,6 +2139,8 @@ pub fn run() {
             disks_cache: Mutex::new(None),
             disks_cache_refreshing: AtomicBool::new(false),
             camera_session: Mutex::new(camera_tethering::CameraSession::new()),
+            fuji_raw_conv_session: Mutex::new(fuji_raw_conv::FujiSessionHandle::new()),
+            fuji_convert_queue: fuji_raw_conv::new_convert_queue(),
         })
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
@@ -2167,6 +2170,22 @@ pub fn run() {
             app_settings::load_settings,
             app_settings::save_settings,
             app_settings::is_tethering_supported,
+            fuji_raw_conv::is_fuji_raw_conv_supported,
+            fuji_raw_conv::fuji_raw_conv_platform_guidance,
+            fuji_raw_conv::fuji_list_cameras,
+            fuji_raw_conv::fuji_connect,
+            fuji_raw_conv::fuji_disconnect,
+            fuji_raw_conv::fuji_recover_session,
+            fuji_raw_conv::fuji_parse_recipe_from_raf,
+            fuji_raw_conv::fuji_recipe_encode_roundtrip,
+            fuji_raw_conv::fuji_enqueue_convert,
+            fuji_raw_conv::fuji_list_queue,
+            fuji_raw_conv::fuji_process_queue,
+            fuji_raw_conv::fuji_get_cached_render,
+            fuji_raw_conv::fuji_cache_stats,
+            fuji_raw_conv::fuji_purge_cache,
+            fuji_raw_conv::fuji_create_camera_render_version,
+            fuji_raw_conv::fuji_connection_status,
             ai_commands::generate_ai_subject_mask,
             ai_commands::precompute_ai_subject_mask,
             ai_commands::generate_ai_foreground_mask,

@@ -17,8 +17,11 @@ import {
 } from 'lucide-react';
 import { Panel, PanelRegion } from '../ui/AppProperties';
 import { SwitcherPlacement, useUIStore } from '../../store/useUIStore';
+import FujiFilmIcon from '../icons/FujiFilmIcon';
 
-export const PANEL_ICONS: Record<Panel, LucideIcon> = {
+type PanelIcon = LucideIcon | typeof FujiFilmIcon;
+
+export const PANEL_ICONS: Record<Panel, PanelIcon> = {
   [Panel.Metadata]: Info,
   [Panel.Adjustments]: SlidersHorizontal,
   [Panel.Crop]: Crop,
@@ -28,6 +31,7 @@ export const PANEL_ICONS: Record<Panel, LucideIcon> = {
   [Panel.Export]: FileInput,
   [Panel.FolderTree]: FolderIcon,
   [Panel.Tethering]: Camera,
+  [Panel.FujiRecipe]: FujiFilmIcon,
 };
 
 const PANEL_TITLES: Record<Panel, string> = {
@@ -40,6 +44,7 @@ const PANEL_TITLES: Record<Panel, string> = {
   [Panel.Export]: 'editor.switcher.tooltips.export',
   [Panel.FolderTree]: 'library.folders.sourcesTitle',
   [Panel.Tethering]: 'editor.switcher.tooltips.tethering',
+  [Panel.FujiRecipe]: 'editor.switcher.tooltips.fujiRecipe',
 };
 
 function PanelTab({ panel, region, side }: { panel: Panel; region: PanelRegion; side: 'left' | 'right' }) {
@@ -92,7 +97,13 @@ function PanelTab({ panel, region, side }: { panel: Panel; region: PanelRegion; 
           transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
         />
       )}
-      <Icon size={20} className="relative z-10 pointer-events-none" />
+      <Icon
+        size={20}
+        className={clsx(
+          'relative z-10 pointer-events-none',
+          panel === Panel.FujiRecipe && (isActive ? 'text-[#FB0020]' : 'text-[#FB0020]/60'),
+        )}
+      />
     </button>
   );
 }

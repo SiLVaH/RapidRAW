@@ -12,6 +12,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [features]
 default = []
 tethering = ["dep:gphoto2"]
+# Fujifilm USB RAW CONV. camera-backed conversion (PTP over nusb).
+# Independent of `tethering` — different USB mode and protocol path.
+fuji-raw-conv = ["dep:nusb"]
 
 [dependencies]
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls", "protocol-asset" ] }
@@ -68,6 +71,9 @@ libc = "0.2.189"
 rgb = "0.8.53"
 imgref = "1.12.2"
 sysinfo = "0.39.6"
+# Pure-Rust USB (no libusb). Still 0.x — pin minor; only referenced from
+# fuji_raw_conv::transport::nusb_transport behind the PtpTransport trait.
+nusb = { version = "=0.2.7", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 trash = "5.2.6"

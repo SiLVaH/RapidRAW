@@ -93,6 +93,8 @@ export default function Controls() {
     [setUI],
   );
 
+  const isCameraRender = Boolean(adjustments?.fujiCameraRender);
+
   const handleToggleVisibility = (sectionName: string) => {
     setAdjustments((prev: Adjustments) => {
       const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
@@ -214,9 +216,13 @@ export default function Controls() {
         <div className="flex items-center gap-1">
           <button
             className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage}
+            disabled={!selectedImage || isCameraRender}
             onClick={handleAutoAdjustments}
-            data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
+            data-tooltip={
+              isCameraRender
+                ? t('editor.fujiRecipe.sceneReferredDisabled')
+                : t('editor.adjustments.tooltips.autoAdjust')
+            }
           >
             <PencilSparkles size={18} />
           </button>
@@ -232,14 +238,27 @@ export default function Controls() {
           </button>
           <button
             className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage}
+            disabled={!selectedImage || isCameraRender}
             onClick={handleResetAdjustments}
-            data-tooltip={t('editor.adjustments.tooltips.resetAdjustments')}
+            data-tooltip={
+              isCameraRender
+                ? t('editor.fujiRecipe.sceneReferredDisabled')
+                : t('editor.adjustments.tooltips.resetAdjustments')
+            }
           >
             <RotateCcw size={18} />
           </button>
         </div>
       </div>
+
+      {isCameraRender && (
+        <div
+          className="mx-3 mt-3 p-2 rounded-md bg-surface text-text-secondary text-xs"
+          data-tooltip={t('editor.fujiRecipe.sceneReferredDisabled')}
+        >
+          {t('editor.fujiRecipe.cameraRenderHint')}
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isWaveformVisible && (
@@ -271,7 +290,14 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-scroll p-3 flex flex-col gap-2">
+      <div
+        className={clsx(
+          'grow overflow-y-scroll p-3 flex flex-col gap-2',
+          isCameraRender && 'opacity-50 pointer-events-none select-none',
+        )}
+        data-tooltip={isCameraRender ? t('editor.fujiRecipe.sceneReferredDisabled') : undefined}
+        aria-disabled={isCameraRender}
+      >
         {selectedImage ? (
           Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
             const SectionComponent: any = {
